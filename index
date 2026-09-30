@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulación de Caudal e Integral Definida - Río Cauca</title>
+  <style>
+    :root{
+      --bg:#f4f8fb;
+      --panel:#ffffff;
+      --ink:#102a43;
+      --muted:#5f7384;
+      --line:#d9e3ea;
+      --blue:#0f5f8f;
+      --blue2:#1f8ec8;
+      --blue3:#8ed0ef;
+      --green:#3b8f6f;
+      --sand:#c9a36a;
+      --danger:#b45309;
+      --ok:#16794f;
+      --shadow:0 10px 28px rgba(16,42,67,.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:linear-gradient(180deg,#f8fbfd 0%,#eef5f9 100%);
+      color:var(--ink);
+    }
+    .wrap{max-width:1220px;margin:0 auto;padding:24px}
+    header{
+      background:linear-gradient(135deg,#0f4f74,#123d59);
+      color:white;
+      border-radius:24px;
+      padding:28px;
+      box-shadow:var(--shadow);
+      margin-bottom:20px;
+    }
+    header h1{margin:0 0 8px;font-size:clamp(1.7rem,3vw,2.7rem)}
+    header p{margin:0;color:#d7edf8;font-size:1rem}
+    .grid{display:grid;gap:18px}
+    .info-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px}
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:18px;
+      box-shadow:var(--shadow);
+      min-width:0;
+    }
+    .card h2,.card h3{margin-top:0}
+    .metric{font-size:1.45rem;font-weight:800;color:var(--blue)}
+    .label{font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+    .two{grid-template-columns:1.25fr .75fr}
+    .three{grid-template-columns:1fr 1fr 1fr}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    button,select,input[type="range"]{
+      font:inherit;
+    }
+    button,select{
+      min-height:44px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 14px;
+      background:white;
+      color:var(--ink);
+    }
+    button{cursor:pointer;font-weight:700}
+    button.primary{background:var(--blue);color:white;border-color:var(--blue)}
+    button:hover{filter:brightness(.98)}
+    select{min-width:220px}
+    .slider-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;margin-top:12px}
+    input[type="range"]{width:100%}
+    .canvas-wrap{
+      width:100%;
+      overflow-x:auto;
+      border-radius:14px;
+      background:#fbfdff;
+      border:1px solid var(--line);
+      padding:8px;
+    }
+    svg{width:100%;height:auto;display:block}
+    .result-big{
+      font-size:clamp(1.6rem,3vw,2.6rem);
+      font-weight:900;
+      color:var(--blue);
+      margin:6px 0 2px;
+      word-break:break-word;
+    }
+    .muted{color:var(--muted)}
+    .math{
+      background:#f7fbfd;
+      border-left:4px solid var(--blue2);
+      border-radius:10px;
+      padding:14px;
+      line-height:1.7;
+      overflow-wrap:anywhere;
+    }
+    .ok{
+      background:#edf9f3;
+      border:1px solid #b8e5cf;
+      color:var(--ok);
+      border-radius:12px;
+      padding:12px 14px;
+      font-weight:800;
+    }
+    .warn{
+      background:#fff7ed;
+      border:1px solid #fed7aa;
+      color:var(--danger);
+      border-radius:12px;
+      padding:12px 14px;
+      font-weight:800;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:.95rem;
+    }
+    th,td{padding:11px 10px;border-bottom:1px solid var(--line);text-align:left}
+    th{background:#f4f8fb}
+    tbody tr{cursor:pointer}
+    tbody tr:hover, tbody tr.active{background:#eef8fd}
+    .pill{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      background:#eaf4fa;
+      color:var(--blue);
+      font-weight:700;
+      font-size:.85rem;
+    }
+    .flow-note{
+      font-size:.86rem;
+      color:var(--muted);
+      margin-top:10px;
+    }
+    .section-title{margin:0 0 12px}
+    .analysis-list{margin:0;padding-left:18px;line-height:1.7}
+    footer{
+      margin:20px 0 4px;
+      color:var(--muted);
+      font-size:.88rem;
+      text-align:center;
+    }
+    @media(max-width:900px){
+      .info-grid,.two,.three{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:640px){
+      .wrap{padding:12px}
+      .info-grid,.two,.three{grid-template-columns:1fr}
+      .slider-row{grid-template-columns:1fr}
+      select{min-width:0;width:100%}
+      .controls button{flex:1 1 130px}
+    }
+  
+    section.card, .grid > .card{height:100%}
+    .two > .card{display:flex;flex-direction:column}
+    .two > .card .canvas-wrap{margin-top:auto}
+    .metric{line-height:1.15}
+    .section-title{line-height:1.2}
+
+  
+    .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .compare-box{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fbfdff}
+    .progress-shell{height:12px;background:#e7eef3;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+    .progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--blue2),var(--green));transition:width .12s linear}
+    .interval-cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+    .interval-mini{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fbfdff}
+    .interval-mini strong{display:block;margin-bottom:5px}
+    .trend-up{color:#16794f;font-weight:800}
+    .trend-down{color:#b45309;font-weight:800}
+    .unit-chain{
+      display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+      padding:12px;border:1px dashed var(--line);border-radius:14px;background:#fbfdff
+    }
+    .unit-chip{padding:8px 10px;border-radius:10px;background:#eef6fb;font-weight:800;color:var(--blue)}
+    .presentation-mode header,
+    .presentation-mode #detailsSection,
+    .presentation-mode #tableSection,
+    .presentation-mode #scopeSection,
+    .presentation-mode footer{display:none}
+    .presentation-mode .wrap{max-width:1400px}
+    .presentation-mode #mainVisuals{grid-template-columns:1.15fr .85fr}
+    .presentation-badge{
+      display:inline-flex;align-items:center;gap:8px;
+      background:#eef6fb;border:1px solid var(--line);border-radius:999px;
+      padding:7px 11px;font-size:.85rem;font-weight:800;color:var(--blue)
+    }
+    .legend-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:.86rem;color:var(--muted)}
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+    @media(max-width:900px){
+      .interval-cards{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:640px){
+      .compare-grid,.interval-cards{grid-template-columns:1fr}
+    }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="pill" style="background:rgba(255,255,255,.14);color:#fff;margin-bottom:12px">Actividad de Cálculo Integral</div>
+      <h1>Simulación de Caudal e Integral Definida</h1>
+      <p>Río Cauca – Estación La Virginia · Interpretación del volumen de agua mediante el área bajo la curva</p>
+    </header>
+    <div class="card" style="margin-bottom:18px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+      <div>
+        <div class="label">Vista de trabajo</div>
+        <div style="font-weight:800">Exploración interactiva de los datos y la integral</div>
+      </div>
+      <div class="controls">
+        <button id="presentationBtn">▣ Modo presentación</button>
+        <span class="presentation-badge">Datos originales conservados</span>
+      </div>
+    </div>
+
+
+    <section class="card" style="margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <h2 class="section-title">Resumen de la estación</h2>
+          <p class="muted" style="margin:0">Datos pedagógicos organizados para analizar el comportamiento del caudal y el volumen mediante integración definida.</p>
+        </div>
+        <div class="pill">6 registros · 36 horas</div>
+      </div>
+      <div class="grid info-grid" style="margin-top:16px;margin-bottom:0">
+        <div><div class="label">Río</div><div class="metric">Río Cauca</div></div>
+        <div><div class="label">Estación</div><div class="metric">La Virginia</div></div>
+        <div><div class="label">Departamento</div><div class="metric">Risaralda</div></div>
+        <div><div class="label">Periodo</div><div class="metric" style="font-size:1.05rem">26/08/2026 06:00<br>27/08/2026 18:00</div></div>
+      </div>
+    </section>
+
+    <section class="grid two" id="mainVisuals">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+          <div>
+            <h2 class="section-title">1. Gráfica de caudal vs. tiempo</h2>
+            <p class="muted" style="margin:0 0 12px">Los seis registros se unen únicamente mediante segmentos rectos.</p>
+          </div>
+          <div class="pill">Área bajo la curva</div>
+        </div>
+        <div class="canvas-wrap">
+          <svg id="chart" viewBox="0 0 900 500" role="img" aria-label="Gráfica interactiva de caudal contra tiempo"></svg>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">2. Controles de exploración</h2>
+        <p class="muted">Selecciona un intervalo o recorre las 36 horas de manera continua.</p>
+        <div class="controls">
+          <button class="primary" id="playBtn">▶ Reproducir</button>
+          <button id="pauseBtn">⏸ Pausar</button>
+          <button id="resetBtn">↺ Reiniciar</button>
+        </div>
+        <div style="margin-top:14px">
+          <label class="label" for="intervalSelect">Intervalo</label>
+          <select id="intervalSelect" aria-label="Seleccionar intervalo" style="width:100%;margin-top:6px">
+            <option value="0">Primer intervalo: 0–6 h</option>
+            <option value="1">Segundo intervalo: 6–12 h</option>
+            <option value="2">Tercer intervalo: 12–24 h</option>
+            <option value="3">Cuarto intervalo: 24–30 h</option>
+            <option value="4">Quinto intervalo: 30–36 h</option>
+            <option value="all">Periodo completo: 0–36 h</option>
+          </select>
+        </div>
+        <div class="slider-row">
+          <span>0 h</span>
+          <input id="timeSlider" type="range" min="0" max="36" step="0.05" value="0" aria-label="Tiempo transcurrido" />
+          <span>36 h</span>
+        </div>
+        <div style="margin-top:14px">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+            <span class="label">Progreso temporal</span>
+            <strong id="progressText">0%</strong>
+          </div>
+          <div class="progress-shell" aria-hidden="true">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+        </div>
+
+
+        <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--line)">
+          <div class="label">Tiempo actual</div>
+          <div class="result-big" id="timeNow">0.00 h</div>
+          <div class="label">Caudal interpolado</div>
+          <div class="result-big" id="flowNow">1.352,67 m³/s</div>
+          <p class="muted" id="dateNow">26/08/2026 · 06:00</p>
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+            <div class="label">Volumen acumulado hasta este instante</div>
+            <div class="result-big" id="accVolume">0 m³</div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section class="grid three" style="margin-top:18px">
+      <div class="card">
+        <div class="label">Duración total</div>
+        <div class="metric">36 horas</div>
+      </div>
+      <div class="card">
+        <div class="label">Caudal mínimo</div>
+        <div class="metric">1.336,39 m³/s</div>
+      </div>
+      <div class="card">
+        <div class="label">Caudal máximo</div>
+        <div class="metric">1.535,20 m³/s</div>
+      </div>
+    </section>
+
+    <section class="grid two" style="margin-top:18px">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+          <div>
+            <h2 class="section-title">3. Corte transversal dinámico del Río Cauca</h2>
+            <p class="muted" style="margin:0 0 12px">Representación esquemática del flujo relativo asociada al caudal seleccionado.</p>
+          </div>
+          <div class="pill">Vista transversal</div>
+        </div>
+        <div class="canvas-wrap">
+          <svg id="riverSvg" viewBox="0 0 900 380" role="img" aria-label="Corte transversal esquemático y animado del río"></svg>
+        </div>
+        <div class="flow-note">
+          Visualización esquemática. El corte transversal y la velocidad gráfica no representan dimensiones físicas reales del Río Cauca; se utilizan únicamente para visualizar los cambios relativos del caudal.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">4. Resultado del intervalo seleccionado</h2>
+        <div class="label">Intervalo</div>
+        <div class="metric" id="intervalLabel">0–6 h</div>
+        <div class="label" style="margin-top:14px">Volumen calculado</div>
+        <div class="result-big" id="intervalVolume">29.532.708 m³</div>
+        <p class="muted">El volumen se obtiene a partir del área bajo el segmento seleccionado y del factor de conversión 3600 s/h.</p>
+      </div>
+    </section>
+
+    <section class="grid two" style="margin-top:18px" id="detailsSection">
+      <div class="card">
+        <h2 class="section-title">5. Integral definida y procedimiento matemático</h2>
+        <div id="mathPanel" class="math"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">6. Comportamiento observado</h2>
+        <ul class="analysis-list">
+          <li><strong>0–6 h:</strong> aumenta de 1352.67 a 1381.84 m³/s.</li>
+          <li><strong>6–12 h:</strong> disminuye de 1381.84 a 1336.39 m³/s.</li>
+          <li><strong>12–24 h:</strong> se presenta el aumento más notable, hasta 1515.47 m³/s.</li>
+          <li><strong>24–30 h:</strong> continúa aumentando hasta 1535.20 m³/s.</li>
+          <li><strong>30–36 h:</strong> disminuye ligeramente hasta 1525.68 m³/s.</li>
+        </ul>
+      </div>
+    </section>
+
+    
+    <section class="card" style="margin-top:18px">
+      <h2 class="section-title">7. Interpretación de unidades</h2>
+      <div class="unit-chain">
+        <span class="unit-chip">m³/s</span>
+        <span>×</span>
+        <span class="unit-chip">horas</span>
+        <span>×</span>
+        <span class="unit-chip">3600 s/h</span>
+        <span>=</span>
+        <span class="unit-chip">m³</span>
+      </div>
+      <p class="muted" style="margin-bottom:0">
+        El factor 3600 convierte las horas de la gráfica a segundos, permitiendo interpretar el área bajo la curva de caudal como volumen.
+      </p>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+      <h2 class="section-title">8. Resumen por intervalos</h2>
+      <div class="interval-cards" id="intervalCards"></div>
+    </section>
+
+<section class="grid two" style="margin-top:18px" id="tableSection">
+      <div class="card">
+        <h2 class="section-title">9. Tabla de datos</h2>
+        <p class="muted">Haz clic en una fila para llevar la simulación a ese registro.</p>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>t (h)</th>
+                <th>Caudal (m³/s)</th>
+              </tr>
+            </thead>
+            <tbody id="dataBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">10. Comprobación del cálculo</h2>
+        <div class="compare-grid">
+          <div class="compare-box">
+            <div class="label">Cálculo manual</div>
+            <div class="metric">29.532.708 m³</div>
+          </div>
+          <div class="compare-box">
+            <div class="label">Simulación</div>
+            <div class="metric" id="verificationValue"></div>
+          </div>
+        </div>
+        <div id="verificationBox" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+      <div class="grid two" style="align-items:center">
+        <div>
+          <div class="label">11. Volumen del periodo completo</div>
+          <div class="result-big" id="totalVolume">186.494.508 m³</div>
+          <div class="canvas-wrap" style="margin-top:14px">
+            <svg id="accChart" viewBox="0 0 900 260" role="img" aria-label="Gráfica de volumen acumulado"></svg>
+          </div>
+          <div class="legend-row">
+            <span><span class="dot" style="background:#0f5f8f"></span>Volumen acumulado</span>
+          </div>
+
+        </div>
+        <div>
+          <p style="margin-top:0">
+            Este valor representa el volumen estimado de agua que pasó por la estación La Virginia durante las 36 horas comprendidas entre las 06:00 del 26 de agosto de 2026 y las 18:00 del 27 de agosto de 2026, bajo el modelo de interpolación lineal entre mediciones.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:18px" id="scopeSection">
+      <h2 class="section-title">12. Alcance del modelo</h2>
+      <p>
+        La integral es exacta para los segmentos rectos construidos. Sin embargo, estos segmentos representan un modelo del comportamiento del caudal entre las mediciones, por lo que el volumen físico del río continúa siendo una estimación.
+      </p>
+      <p class="muted">
+        No se infieren profundidad, ancho del cauce, velocidad física real ni geometría hidráulica, porque esos datos no fueron suministrados.
+      </p>
+    </section>
+
+    <footer>
+      Simulación académica basada únicamente en los seis registros suministrados para la actividad.
+    </footer>
+  </div>
+
+<script>
+    const datos = [
+      {t:0,  q:1352.67, fecha:"26/08/2026", hora:"06:00"},
+      {t:6,  q:1381.84, fecha:"26/08/2026", hora:"12:00"},
+      {t:12, q:1336.39, fecha:"26/08/2026", hora:"18:00"},
+      {t:24, q:1515.47, fecha:"27/08/2026", hora:"06:00"},
+      {t:30, q:1535.20, fecha:"27/08/2026", hora:"12:00"},
+      {t:36, q:1525.68, fecha:"27/08/2026", hora:"18:00"}
+    ];
+
+    const expectedTimes = [0,6,12,24,30,36];
+    const expectedFlows = [1352.67,1381.84,1336.39,1515.47,1535.20,1525.68];
+
+    const nf0 = new Intl.NumberFormat('es-CO',{maximumFractionDigits:0});
+    const nf2 = new Intl.NumberFormat('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const nf4 = new Intl.NumberFormat('es-CO',{minimumFractionDigits:4,maximumFractionDigits:4});
+
+    const chart = document.getElementById('chart');
+    const riverSvg = document.getElementById('riverSvg');
+    const slider = document.getElementById('timeSlider');
+    const intervalSelect = document.getElementById('intervalSelect');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const timeNow = document.getElementById('timeNow');
+    const flowNow = document.getElementById('flowNow');
+    const dateNow = document.getElementById('dateNow');
+    const intervalLabel = document.getElementById('intervalLabel');
+    const intervalVolume = document.getElementById('intervalVolume');
+    const mathPanel = document.getElementById('mathPanel');
+    const dataBody = document.getElementById('dataBody');
+    const verificationValue = document.getElementById('verificationValue');
+    const verificationBox = document.getElementById('verificationBox');
+    const totalVolume = document.getElementById('totalVolume');
+    const accVolume = document.getElementById('accVolume');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const intervalCards = document.getElementById('intervalCards');
+    const accChart = document.getElementById('accChart');
+    const presentationBtn = document.getElementById('presentationBtn');
+
+    let currentTime = 0;
+    let raf = null;
+    let lastTs = null;
+    let playing = false;
+
+    function interpolarCaudal(t){
+      if(t <= datos[0].t) return datos[0].q;
+      if(t >= datos.at(-1).t) return datos.at(-1).q;
+      for(let i=0;i<datos.length-1;i++){
+        const a = datos[i], b = datos[i+1];
+        if(t >= a.t && t <= b.t){
+          const u = (t-a.t)/(b.t-a.t);
+          return a.q + (b.q-a.q)*u;
+        }
+      }
+      return datos.at(-1).q;
+    }
+
+    function indiceIntervaloPorTiempo(t){
+      if(t >= datos.at(-1).t) return datos.length-2;
+      for(let i=0;i<datos.length-1;i++){
+        if(t >= datos[i].t && t < datos[i+1].t) return i;
+      }
+      return 0;
+    }
+
+    function calcularVolumenIntervalo(i){
+      const a = datos[i], b = datos[i+1];
+      return 3600 * ((a.q+b.q)/2) * (b.t-a.t);
+    }
+
+    function calcularVolumenTotal(){
+      let total = 0;
+      for(let i=0;i<datos.length-1;i++) total += calcularVolumenIntervalo(i);
+      return total;
+    }
+
+    function calcularVolumenAcumulado(t){
+      if(t <= datos[0].t) return 0;
+      let total = 0;
+      for(let i=0;i<datos.length-1;i++){
+        const a = datos[i], b = datos[i+1];
+        if(t >= b.t){
+          total += calcularVolumenIntervalo(i);
+        }else if(t > a.t){
+          const qT = interpolarCaudal(t);
+          total += 3600 * ((a.q + qT)/2) * (t-a.t);
+          break;
+        }else{
+          break;
+        }
+      }
+      return total;
+    }
+
+    function construirTarjetasIntervalos(){
+      intervalCards.innerHTML = '';
+      for(let i=0;i<datos.length-1;i++){
+        const a=datos[i], b=datos[i+1];
+        const trend=b.q>=a.q ? '↑ Aumenta' : '↓ Disminuye';
+        const cls=b.q>=a.q ? 'trend-up' : 'trend-down';
+        const div=document.createElement('div');
+        div.className='interval-mini';
+        div.innerHTML=`
+          <strong>${a.t}–${b.t} h</strong>
+          <div class="${cls}">${trend}</div>
+          <div class="muted" style="margin-top:5px">Δt: ${b.t-a.t} h</div>
+          <div style="margin-top:6px;font-weight:800">${nf0.format(calcularVolumenIntervalo(i))} m³</div>
+        `;
+        intervalCards.appendChild(div);
+      }
+    }
+
+    function actualizarGraficaAcumulada(){
+      const W=900,H=260,ml=70,mr=24,mt=20,mb=48;
+      const x0=ml,x1=W-mr,y0=H-mb,y1=mt;
+      const total=calcularVolumenTotal();
+      const sx=t=>x0+(t/36)*(x1-x0);
+      const sy=v=>y0-(v/total)*(y0-y1);
+
+      let s=`<rect x="0" y="0" width="${W}" height="${H}" fill="#fbfdff"/>`;
+      for(let t=0;t<=36;t+=6){
+        const x=sx(t);
+        s+=`<line x1="${x}" y1="${y1}" x2="${x}" y2="${y0}" stroke="#e1e9ef"/>`;
+        s+=`<text x="${x}" y="${y0+24}" text-anchor="middle" font-size="12" fill="#5f7384">${t}</text>`;
+      }
+      for(let k=0;k<=4;k++){
+        const v=total*k/4, y=sy(v);
+        s+=`<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="#e1e9ef"/>`;
+        s+=`<text x="${x0-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#5f7384">${nf0.format(v/1e6)} M</text>`;
+      }
+      s+=`<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}" stroke="#102a43"/>`;
+      s+=`<line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="#102a43"/>`;
+      s+=`<text x="${(x0+x1)/2}" y="${H-10}" text-anchor="middle" font-size="13" fill="#102a43">Tiempo (h)</text>`;
+
+      const pts=[];
+      for(let t=0;t<=36;t+=0.5){
+        pts.push([sx(t),sy(calcularVolumenAcumulado(t))]);
+      }
+      pts.push([sx(36),sy(total)]);
+      const path=pts.map((p,i)=>`${i?'L':'M'} ${p[0]} ${p[1]}`).join(' ');
+      s+=`<path d="${path}" fill="none" stroke="#0f5f8f" stroke-width="4" stroke-linecap="round"/>`;
+
+      const cv=calcularVolumenAcumulado(currentTime);
+      s+=`<circle cx="${sx(currentTime)}" cy="${sy(cv)}" r="7" fill="#c9a36a" stroke="#fff" stroke-width="3"/>`;
+      accChart.innerHTML=s;
+    }
+
+
+    function fechaHoraAproximada(t){
+      const start = new Date(Date.UTC(2026,7,26,6,0,0));
+      const d = new Date(start.getTime() + t*3600*1000);
+      const dd = String(d.getUTCDate()).padStart(2,'0');
+      const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+      const yyyy = d.getUTCFullYear();
+      const hh = String(d.getUTCHours()).padStart(2,'0');
+      const mi = String(d.getUTCMinutes()).padStart(2,'0');
+      return `${dd}/${mm}/${yyyy} · ${hh}:${mi}`;
+    }
+
+    function actualizarPanel(){
+      const q = interpolarCaudal(currentTime);
+      timeNow.textContent = `${nf2.format(currentTime)} h`;
+      flowNow.textContent = `${nf2.format(q)} m³/s`;
+      dateNow.textContent = fechaHoraAproximada(currentTime);
+      const acc = calcularVolumenAcumulado(currentTime);
+      accVolume.textContent = `${nf0.format(acc)} m³`;
+      const pct = Math.max(0, Math.min(100, currentTime/36*100));
+      progressBar.style.width = `${pct}%`;
+      progressText.textContent = `${nf0.format(pct)}%`;
+
+      const val = intervalSelect.value;
+      if(val === 'all'){
+        intervalLabel.textContent = '0–36 h';
+        intervalVolume.textContent = `${nf0.format(calcularVolumenTotal())} m³`;
+        mathPanel.innerHTML = `
+          <strong>Periodo completo</strong><br>
+          V<sub>total</sub> = V₁ + V₂ + V₃ + V₄ + V₅<br><br>
+          V<sub>total</sub> = ${nf0.format(calcularVolumenTotal())} m³<br><br>
+          La suma integra exactamente los cinco segmentos lineales construidos entre los seis registros.
+        `;
+      }else{
+        const i = Number(val);
+        const a = datos[i], b = datos[i+1];
+        const dt = b.t-a.t;
+        const m = (b.q-a.q)/dt;
+        const vol = calcularVolumenIntervalo(i);
+        intervalLabel.textContent = `${a.t}–${b.t} h`;
+        intervalVolume.textContent = `${nf0.format(vol)} m³`;
+
+        let funcion;
+        let integral;
+        if(i===0){
+          funcion = `Q(t) = 1352.67 + (29.17/6)t`;
+          integral = `V = 3600 ∫₀⁶ [1352.67 + (29.17/6)t] dt`;
+        }else{
+          funcion = `Q(t) = ${a.q.toFixed(2)} + (${(b.q-a.q).toFixed(2)}/${dt})(t - ${a.t})`;
+          integral = `V = 3600 ∫${sub(a.t)}${sup(b.t)} Q(t) dt`;
+        }
+
+        mathPanel.innerHTML = `
+          <strong>Intervalo ${a.t}–${b.t} h</strong><br><br>
+          t inicial = ${a.t} h<br>
+          t final = ${b.t} h<br>
+          Q inicial = ${nf2.format(a.q)} m³/s<br>
+          Q final = ${nf2.format(b.q)} m³/s<br>
+          Δt = ${dt} h<br><br>
+          Pendiente:<br>
+          m = (${b.q.toFixed(2)} - ${a.q.toFixed(2)}) / (${b.t} - ${a.t}) = ${nf4.format(m)}<br><br>
+          Función lineal:<br>
+          ${funcion}<br><br>
+          Integral:<br>
+          ${integral}<br><br>
+          Factor de conversión: 3600 s/h<br><br>
+          <strong>Volumen = ${nf0.format(vol)} m³</strong>
+          ${i===0 ? `<br><br>Antiderivada:<br>1352.67t + (29.17/12)t²<br><br>
+          Evaluación:<br>V₁ = 3600 [1352.67t + (29.17/12)t²]₀⁶<br><br>
+          Verificación: f(0)=1352.67 y f(6)=1381.84` : ''}
+        `;
+      }
+      actualizarGrafica();
+      actualizarCorteTransversal();
+      actualizarGraficaAcumulada();
+      resaltarFila();
+    }
+
+    function sub(n){
+      const m = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','-':'₋'};
+      return String(n).split('').map(c=>m[c]||c).join('');
+    }
+    function sup(n){
+      const m = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻'};
+      return String(n).split('').map(c=>m[c]||c).join('');
+    }
+
+    function actualizarGrafica(){
+      const W=900,H=500, ml=78,mr=28,mt=24,mb=62;
+      const x0=ml, x1=W-mr, y0=H-mb, y1=mt;
+      const yMin=0, yMax=1650;
+      const sx = t => x0 + (t/36)*(x1-x0);
+      const sy = q => y0 - ((q-yMin)/(yMax-yMin))*(y0-y1);
+
+      let svg = `
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1f8ec8" stop-opacity=".42"/>
+            <stop offset="100%" stop-color="#1f8ec8" stop-opacity=".08"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="${W}" height="${H}" fill="#fbfdff"/>
+      `;
+
+      for(let t=0;t<=36;t+=6){
+        const x=sx(t);
+        svg += `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y0}" stroke="#dfe8ee" stroke-width="1"/>`;
+        svg += `<text x="${x}" y="${y0+28}" text-anchor="middle" font-size="13" fill="#5f7384">${t}</text>`;
+      }
+      for(let q=0;q<=1600;q+=200){
+        const y=sy(q);
+        svg += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="#dfe8ee" stroke-width="1"/>`;
+        svg += `<text x="${x0-12}" y="${y+4}" text-anchor="end" font-size="13" fill="#5f7384">${q}</text>`;
+      }
+
+      svg += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}" stroke="#102a43" stroke-width="1.5"/>`;
+      svg += `<line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="#102a43" stroke-width="1.5"/>`;
+      svg += `<text x="${(x0+x1)/2}" y="${H-14}" text-anchor="middle" font-size="15" fill="#102a43">Tiempo transcurrido (horas)</text>`;
+      svg += `<text x="18" y="${(y0+y1)/2}" text-anchor="middle" transform="rotate(-90 18 ${(y0+y1)/2})" font-size="15" fill="#102a43">Caudal Q (m³/s)</text>`;
+
+      let selStart=0, selEnd=36;
+      if(intervalSelect.value!=='all'){
+        const i=Number(intervalSelect.value);
+        selStart=datos[i].t; selEnd=datos[i+1].t;
+      }
+
+      const areaPts = [];
+      areaPts.push(`${sx(selStart)},${sy(0)}`);
+      const qStart = interpolarCaudal(selStart);
+      areaPts.push(`${sx(selStart)},${sy(qStart)}`);
+      for(const d of datos){
+        if(d.t>selStart && d.t<selEnd) areaPts.push(`${sx(d.t)},${sy(d.q)}`);
+      }
+      const qEnd = interpolarCaudal(selEnd);
+      areaPts.push(`${sx(selEnd)},${sy(qEnd)}`);
+      areaPts.push(`${sx(selEnd)},${sy(0)}`);
+      svg += `<polygon points="${areaPts.join(' ')}" fill="url(#areaGrad)" stroke="none"/>`;
+
+      let path='';
+      datos.forEach((d,i)=>{
+        path += `${i===0?'M':'L'} ${sx(d.t)} ${sy(d.q)} `;
+      });
+      svg += `<path d="${path}" fill="none" stroke="#0f5f8f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+      if(intervalSelect.value!=='all'){
+        const i=Number(intervalSelect.value);
+        const a=datos[i],b=datos[i+1];
+        svg += `<line x1="${sx(a.t)}" y1="${sy(a.q)}" x2="${sx(b.t)}" y2="${sy(b.q)}" stroke="#3b8f6f" stroke-width="7" stroke-linecap="round"/>`;
+      }
+
+      datos.forEach((d,i)=>{
+        svg += `
+          <circle cx="${sx(d.t)}" cy="${sy(d.q)}" r="7" fill="#ffffff" stroke="#0f5f8f" stroke-width="3"
+                  data-index="${i}" tabindex="0" role="button" aria-label="Dato ${i+1}: ${d.fecha} ${d.hora}, ${d.q} metros cúbicos por segundo"/>
+        `;
+      });
+
+      const q=interpolarCaudal(currentTime);
+      svg += `<circle cx="${sx(currentTime)}" cy="${sy(q)}" r="9" fill="#c9a36a" stroke="#ffffff" stroke-width="3"/>`;
+      svg += `<text x="${sx(currentTime)+12}" y="${sy(q)-12}" font-size="13" fill="#102a43">${nf2.format(q)} m³/s</text>`;
+
+      chart.innerHTML=svg;
+
+      chart.querySelectorAll('circle[data-index]').forEach(c=>{
+        const activate=()=>{
+          const d=datos[Number(c.dataset.index)];
+          currentTime=d.t; slider.value=d.t;
+          actualizarPanel();
+        };
+        c.addEventListener('click',activate);
+        c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate();}});
+      });
+    }
+
+    function actualizarCorteTransversal(){
+      const q=interpolarCaudal(currentTime);
+      const qMin=Math.min(...datos.map(d=>d.q));
+      const qMax=Math.max(...datos.map(d=>d.q));
+      const intensity=(q-qMin)/(qMax-qMin || 1);
+      const arrowGap=80 - intensity*22;
+      const speed=1.7 - intensity*0.8;
+
+      riverSvg.innerHTML = `
+        <defs>
+          <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#8ed0ef"/>
+            <stop offset="100%" stop-color="#1f8ec8"/>
+          </linearGradient>
+          <pattern id="flowPattern" width="${arrowGap}" height="36" patternUnits="userSpaceOnUse">
+            <path d="M5 18 H45 M35 10 L45 18 L35 26" fill="none" stroke="rgba(255,255,255,.82)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </pattern>
+        </defs>
+        <rect x="0" y="0" width="900" height="380" fill="#f8fbfd"/>
+        <path d="M0 180 C110 150 180 140 260 190 C330 232 390 274 450 290 C520 270 600 220 665 190 C750 150 820 160 900 190 L900 380 L0 380 Z" fill="#d9c39e"/>
+        <path d="M225 182 C330 250 395 285 450 300 C515 280 590 225 680 180 L680 305 C590 330 530 345 450 350 C360 344 300 326 225 305 Z" fill="url(#waterGrad)"/>
+        <path d="M225 182 C330 250 395 285 450 300 C515 280 590 225 680 180" fill="none" stroke="#0f5f8f" stroke-width="4"/>
+        <rect x="260" y="205" width="380" height="95" fill="url(#flowPattern)" opacity="${0.55+0.35*intensity}">
+          <animate attributeName="x" from="220" to="280" dur="${speed}s" repeatCount="indefinite"/>
+        </rect>
+        <line x1="170" y1="65" x2="170" y2="175" stroke="#4b5563" stroke-width="5"/>
+        <rect x="145" y="50" width="50" height="30" rx="6" fill="#ffffff" stroke="#4b5563"/>
+        <circle cx="170" cy="65" r="5" fill="#3b8f6f"/>
+        <text x="105" y="38" font-size="16" fill="#102a43">Estación de monitoreo</text>
+        <text x="40" y="165" font-size="15" fill="#5f7384">Margen izquierda</text>
+        <text x="710" y="165" font-size="15" fill="#5f7384">Margen derecha</text>
+        <text x="450" y="332" text-anchor="middle" font-size="15" fill="#ffffff" font-weight="700">Flujo relativo →</text>
+        <g>
+          <text x="52" y="320" font-size="12" fill="#5f7384">Intensidad visual del flujo</text>
+          <rect x="52" y="332" width="150" height="12" rx="6" fill="#e7eef3"/>
+          <rect x="52" y="332" width="${150*intensity}" height="12" rx="6" fill="#3b8f6f"/>
+        </g>
+
+        <rect x="610" y="28" width="250" height="98" rx="14" fill="#ffffff" stroke="#d9e3ea"/>
+        <text x="630" y="55" font-size="13" fill="#5f7384">Caudal actual</text>
+        <text x="630" y="84" font-size="24" fill="#0f5f8f" font-weight="800">${nf2.format(q)} m³/s</text>
+        <text x="630" y="109" font-size="13" fill="#5f7384">${fechaHoraAproximada(currentTime)}</text>
+      `;
+    }
+
+    function resaltarFila(){
+      [...dataBody.querySelectorAll('tr')].forEach((tr,i)=>{
+        tr.classList.toggle('active', Math.abs(datos[i].t-currentTime)<0.001);
+      });
+    }
+
+    function construirTabla(){
+      dataBody.innerHTML='';
+      datos.forEach((d,i)=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${d.fecha}</td><td>${d.hora}</td><td>${d.t}</td><td>${nf2.format(d.q)}</td>`;
+        tr.addEventListener('click',()=>{
+          currentTime=d.t;
+          slider.value=d.t;
+          actualizarPanel();
+        });
+        dataBody.appendChild(tr);
+      });
+    }
+
+    function iniciarAnimacion(){
+      if(playing) return;
+      playing=true; lastTs=null;
+      const step=(ts)=>{
+        if(!playing) return;
+        if(lastTs===null) lastTs=ts;
+        const dt=(ts-lastTs)/1000;
+        lastTs=ts;
+        currentTime += dt*(36/24); // 36 h simuladas en ~24 s reales
+        if(currentTime>=36){
+          currentTime=36;
+          playing=false;
+        }
+        slider.value=currentTime;
+        actualizarPanel();
+        if(playing) raf=requestAnimationFrame(step);
+      };
+      raf=requestAnimationFrame(step);
+    }
+
+    function pausarAnimacion(){
+      playing=false;
+      if(raf) cancelAnimationFrame(raf);
+      raf=null; lastTs=null;
+    }
+
+    function reiniciarAnimacion(){
+      pausarAnimacion();
+      currentTime=0;
+      slider.value=0;
+      actualizarPanel();
+    }
+
+    slider.addEventListener('input',()=>{
+      currentTime=Number(slider.value);
+      actualizarPanel();
+    });
+
+    intervalSelect.addEventListener('change',actualizarPanel);
+    playBtn.addEventListener('click',iniciarAnimacion);
+    pauseBtn.addEventListener('click',pausarAnimacion);
+    resetBtn.addEventListener('click',reiniciarAnimacion);
+
+    presentationBtn.addEventListener('click',()=>{
+      document.body.classList.toggle('presentation-mode');
+      const active=document.body.classList.contains('presentation-mode');
+      presentationBtn.textContent = active ? '↩ Salir de presentación' : '▣ Modo presentación';
+    });
+
+    // Validaciones automáticas
+    const validData =
+      datos.length===6 &&
+      datos.every((d,i)=>d.t===expectedTimes[i] && d.q===expectedFlows[i]);
+
+    const v1 = calcularVolumenIntervalo(0);
+    const vt = calcularVolumenTotal();
+
+    verificationValue.textContent = `${nf0.format(v1)} m³`;
+    totalVolume.textContent = `${nf0.format(vt)} m³`;
+
+    const verified = validData && Math.abs(v1-29532708)<0.01 && Math.abs(vt-186494508)<0.01;
+    verificationBox.className = verified ? 'ok' : 'warn';
+    verificationBox.textContent = verified ? '✓ Cálculo verificado correctamente' : '⚠ Revisar cálculo';
+
+    construirTabla();
+    construirTarjetasIntervalos();
+    actualizarPanel();
+  </script>
+</body>
+</html>
+
